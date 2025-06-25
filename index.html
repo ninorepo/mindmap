@@ -48,18 +48,21 @@
       text-align: center;
     }
     .menu {
-      position: fixed;
-      bottom: 20px;
-      left: 20px;
-      max-height: 90%;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      z-index: 100;
-    }
-    .menu::-webkit-scrollbar {
-      display: none;
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  max-height: 90%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 100;
+  padding-right: 5px; /* space for hidden scrollbar */
+  scrollbar-width: none; /* Firefox */
+}
+.menu::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
     }
     .fab.green { background: #28a745; }
     .fab.gray  { background: #6c757d; }
