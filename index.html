@@ -60,6 +60,7 @@
       background: rgba(255, 255, 255, 0.9);
       border-radius: 12px;
       scrollbar-width: none;
+      flex-wrap: wrap;
     }
     .menu::-webkit-scrollbar {
       display: none;
@@ -91,10 +92,8 @@
 </head>
 <body>
 
-  <!-- Toggle Menu Button -->
   <button id="toggleMenu">☰</button>
 
-  <!-- Horizontal Bottom Menu -->
   <div class="menu">
     <button class="fab" onclick="saveMap()">💾 Save</button>
     <label class="fab green" style="cursor:pointer">
@@ -106,7 +105,6 @@
     <button class="fab gray" onclick="redo()">↪️ Redo</button>
   </div>
 
-  <!-- Mind Map SVG -->
   <svg id="mindmap"></svg>
 
   <script>
@@ -116,12 +114,13 @@
     const height = window.innerHeight;
 
     svg.call(
-      d3.zoom()
-        .scaleExtent([0.2, 3])
-        .on("zoom", (event) => {
-          g.attr("transform", event.transform);
-        })
-    ).on("dblclick.zoom", null);
+      d3.zoom().scaleExtent([0.2, 3]).on("zoom", (event) => {
+        g.attr("transform", event.transform);
+      })
+    ).on("dblclick.zoom", null).on("click", () => {
+      selectedId = null;
+      update();
+    });
 
     let nodes = [{ id: 1, label: "Root", x: width / 2, y: height / 2 }];
     let links = [];
@@ -160,6 +159,22 @@
       return nodes.find(n => n.id === id);
     }
 
+    function wrapText(text, maxChars = 12) {
+      const words = text.split(/\s+/);
+      const lines = [];
+      let line = "";
+      for (let word of words) {
+        if ((line + " " + word).trim().length <= maxChars) {
+          line += " " + word;
+        } else {
+          lines.push(line.trim());
+          line = word;
+        }
+      }
+      if (line) lines.push(line.trim());
+      return lines;
+    }
+
     function update() {
       g.selectAll("*").remove();
 
@@ -179,6 +194,7 @@
         .on("click", (event, d) => {
           event.stopPropagation();
           selectedId = d.id;
+          update();
         })
         .call(d3.drag().on("drag", (event, d) => {
           d.x = event.x;
@@ -187,20 +203,37 @@
         }));
 
       nodeGroup.append("circle")
-        .attr("r", 30)
         .attr("class", "node")
+        .attr("r", d => {
+          const lines = wrapText(d.label);
+          const maxLength = Math.max(...lines.map(l => l.length));
+          return Math.max(30, maxLength * 4.5);
+        })
         .attr("stroke", d => d.id === selectedId ? "blue" : "black")
         .attr("stroke-width", d => d.id === selectedId ? 4 : 2);
 
       nodeGroup.append("text")
         .attr("class", "label")
-        .attr("dy", "0.35em")
-        .text(d => d.label)
+        .attr("text-anchor", "middle")
+        .attr("dy", d => {
+          const lines = wrapText(d.label);
+          return -(lines.length - 1) * 7;
+        })
         .style("pointer-events", "all")
+        .each(function(d) {
+          const lines = wrapText(d.label);
+          d3.select(this)
+            .selectAll("tspan")
+            .data(lines)
+            .join("tspan")
+            .attr("x", 0)
+            .attr("dy", (d, i) => i === 0 ? 0 : "1.2em")
+            .text(d => d);
+        })
         .on("click", (event, d) => {
           event.stopPropagation();
           const newLabel = prompt("Edit label:", d.label);
-          if (newLabel) {
+          if (newLabel !== null) {
             d.label = newLabel;
             saveState();
             update();
@@ -283,34 +316,19 @@
       reader.readAsText(file);
     }
 
-    // ✅ Inline style helper
     function inlineStyles(svgElement) {
-  svgElement.querySelectorAll("*").forEach(el => {
-    const computed = getComputedStyle(el);
-    const tag = el.tagName.toLowerCase();
-
-    // General common styles
-    el.setAttribute("fill", computed.fill);
-    el.setAttribute("stroke", computed.stroke);
-    el.setAttribute("stroke-width", computed["stroke-width"]);
-    el.setAttribute("font-size", computed["font-size"]);
-    el.setAttribute("font-family", computed["font-family"]);
-    el.setAttribute("text-anchor", computed["text-anchor"]);
-    el.setAttribute("dominant-baseline", computed["dominant-baseline"]);
-
-    // Fix missing styles for circle and text
-    if (tag === "circle") {
-      el.setAttribute("r", el.getAttribute("r") || "30");
-      el.setAttribute("fill", el.getAttribute("fill") || "white");
-      el.setAttribute("stroke", el.getAttribute("stroke") || "black");
+      svgElement.querySelectorAll("*").forEach(el => {
+        const computed = getComputedStyle(el);
+        el.setAttribute("fill", computed.fill);
+        el.setAttribute("stroke", computed.stroke);
+        el.setAttribute("stroke-width", computed["stroke-width"]);
+        el.setAttribute("font-size", computed["font-size"]);
+        el.setAttribute("font-family", computed["font-family"]);
+        el.setAttribute("text-anchor", computed["text-anchor"]);
+        el.setAttribute("dominant-baseline", computed["dominant-baseline"]);
+      });
     }
-    if (tag === "text") {
-      el.setAttribute("fill", el.getAttribute("fill") || "black");
-    }
-  });
-}
 
-    // ✅ Fixed exportImage()
     function exportImage() {
       const clone = svg.node().cloneNode(true);
       inlineStyles(clone);
@@ -337,7 +355,6 @@
       img.src = url;
     }
 
-    // ✅ Fixed exportPDF()
     async function exportPDF() {
       const clone = svg.node().cloneNode(true);
       inlineStyles(clone);
