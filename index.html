@@ -13,8 +13,8 @@
       background: #f5f5f5;
     }
     svg {
-      width: 100%;
-      height: 100%;
+      width: 100vw;
+      height: 100vh;
       touch-action: none;
     }
     .node {
@@ -33,27 +33,34 @@
       pointer-events: none;
     }
     .fab {
-  width: 120px; /* fixed width for consistency */
-  text-align: center;
-  white-space: nowrap;
-}
-.menu {
-  position: fixed;
-  bottom: 20px;
-  left: 20px;
-  max-height: 90%;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  z-index: 100;
-  scrollbar-width: none;
-}
-.menu::-webkit-scrollbar {
-  display: none;
-}
-    
-    
+      position: fixed;
+      bottom: 20px;
+      padding: 12px 16px;
+      margin: 5px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 20px;
+      font-size: 16px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+      z-index: 100;
+      width: 120px;
+      text-align: center;
+    }
+    .menu {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      max-height: 90%;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 100;
+    }
+    .menu::-webkit-scrollbar {
+      display: none;
+    }
     .fab.green { background: #28a745; }
     .fab.gray  { background: #6c757d; }
     input[type="file"] {
@@ -65,8 +72,6 @@
 </head>
 <body>
   <div class="menu">
-    <button class="fab" onclick="addNode()">+ Node</button>
-    <button class="fab" onclick="deleteNode()">🗑️ Delete</button>
     <button class="fab" onclick="saveMap()">💾 Save</button>
     <label class="fab green" style="cursor:pointer">
       📂 Load<input type="file" onchange="loadMap(event)">
@@ -83,12 +88,19 @@
     const g = svg.append("g");
     const width = window.innerWidth;
     const height = window.innerHeight;
-    svg.attr("viewBox", [0, 0, width, height]);
+
+    // Enable zoom & pan
+    svg.call(
+      d3.zoom()
+        .scaleExtent([0.2, 3])
+        .on("zoom", (event) => {
+          g.attr("transform", event.transform);
+        })
+    ).on("dblclick.zoom", null);
 
     let nodes = [{ id: 1, label: "Root", x: width / 2, y: height / 2 }];
     let links = [];
     let selectedId = 1;
-    let longPressTimer;
     let history = [];
     let future = [];
 
@@ -139,14 +151,8 @@
         .data(nodes, d => d.id)
         .join("g")
         .attr("transform", d => `translate(${d.x},${d.y})`)
-        .on("mousedown touchstart", (event, d) => {
-          longPressTimer = setTimeout(() => {
-            selectedId = d.id;
-            deleteNode();
-          }, 800);
-        })
-        .on("mouseup touchend", () => clearTimeout(longPressTimer))
         .on("click", (event, d) => {
+          event.stopPropagation();
           selectedId = d.id;
         })
         .call(d3.drag().on("drag", (event, d) => {
@@ -157,12 +163,15 @@
 
       nodeGroup.append("circle")
         .attr("r", 30)
-        .attr("class", "node");
+        .attr("class", "node")
+        .attr("stroke", d => d.id === selectedId ? "blue" : "black")
+        .attr("stroke-width", d => d.id === selectedId ? 4 : 2);
 
       nodeGroup.append("text")
         .attr("class", "label")
         .attr("dy", "0.35em")
         .text(d => d.label)
+        .style("pointer-events", "all")
         .on("click", (event, d) => {
           event.stopPropagation();
           const newLabel = prompt("Edit label:", d.label);
@@ -172,26 +181,57 @@
             update();
           }
         });
+
+      // Add (+) button
+      nodeGroup.append("text")
+        .attr("x", 35)
+        .attr("y", -10)
+        .attr("class", "label")
+        .style("font-size", "16px")
+        .style("cursor", "pointer")
+        .style("pointer-events", "all")
+        .text("+")
+        .on("click", (event, d) => {
+          event.stopPropagation();
+          addNodeTo(d.id);
+        });
+
+      // Add (🗑️) button
+      nodeGroup.append("text")
+        .attr("x", 35)
+        .attr("y", 10)
+        .attr("class", "label")
+        .style("font-size", "16px")
+        .style("cursor", "pointer")
+        .style("pointer-events", "all")
+        .text("🗑️")
+        .on("click", (event, d) => {
+          event.stopPropagation();
+          if (d.id === 1) return alert("Can't delete root");
+          deleteNodeById(d.id);
+        });
     }
 
-    function addNode() {
+    function addNodeTo(parentId) {
       const id = Date.now();
       const label = prompt("Label:", "Node") || "Node";
-      const parent = getNodeById(selectedId);
-      const x = parent.x + 100;
-      const y = parent.y + 100;
+      const parent = getNodeById(parentId);
+      const children = links.filter(l => l.source === parentId).length;
+      const angle = (children * 45) * (Math.PI / 180);
+      const x = parent.x + 120 * Math.cos(angle);
+      const y = parent.y + 120 * Math.sin(angle);
+
       nodes.push({ id, label, x, y });
-      links.push({ source: selectedId, target: id });
+      links.push({ source: parentId, target: id });
       selectedId = id;
       saveState();
       update();
     }
 
-    function deleteNode() {
-      if (selectedId === 1) return alert("Can't delete root node.");
-      nodes = nodes.filter(n => n.id !== selectedId);
-      links = links.filter(l => l.source !== selectedId && l.target !== selectedId);
-      selectedId = 1;
+    function deleteNodeById(id) {
+      nodes = nodes.filter(n => n.id !== id);
+      links = links.filter(l => l.source !== id && l.target !== id);
+      if (selectedId === id) selectedId = 1;
       saveState();
       update();
     }
