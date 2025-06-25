@@ -10,12 +10,12 @@
       width: 100%; height: 100%;
       overflow: hidden;
       font-family: sans-serif;
+      background-color: #f5f5f5;
     }
 
     #mindmap {
       width: 100%;
       height: 100%;
-      background: #f5f5f5;
       touch-action: none;
     }
 
@@ -30,11 +30,113 @@
       stroke: #999;
       stroke-width: 2px;
     }
+
+    text {
+      font-size: 14px;
+      fill: #333;
+      pointer-events: none;
+    }
   </style>
 </head>
 <body>
   <svg id="mindmap"></svg>
+
   <script src="https://d3js.org/d3.v7.min.js"></script>
-  <script src="mindmap.js"></script>
+  <script>
+    const svg = d3.select("#mindmap");
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    svg.attr("viewBox", [0, 0, width, height]);
+
+    let nodes = [
+      { id: 1, label: "Root", x: width / 2, y: height / 2 }
+    ];
+    let links = [];
+
+    let drag = d3.drag()
+      .on("start", dragStarted)
+      .on("drag", dragged)
+      .on("end", dragEnded);
+
+    const container = svg.append("g");
+
+    svg.call(
+      d3.zoom().on("zoom", (event) => {
+        container.attr("transform", event.transform);
+      })
+    );
+
+    function update() {
+      container.selectAll("*").remove();
+
+      // Draw links
+      container.selectAll("line")
+        .data(links)
+        .join("line")
+        .attr("class", "link")
+        .attr("x1", d => getNodeById(d.source).x)
+        .attr("y1", d => getNodeById(d.source).y)
+        .attr("x2", d => getNodeById(d.target).x)
+        .attr("y2", d => getNodeById(d.target).y);
+
+      // Draw nodes
+      const nodeGroup = container.selectAll("g.node-group")
+        .data(nodes, d => d.id)
+        .join(enter => {
+          const g = enter.append("g")
+            .attr("class", "node-group")
+            .call(drag);
+
+          g.append("circle")
+            .attr("class", "node")
+            .attr("r", 30);
+
+          g.append("text")
+            .attr("dy", "0.35em")
+            .attr("text-anchor", "middle");
+
+          return g;
+        });
+
+      nodeGroup.attr("transform", d => `translate(${d.x},${d.y})`);
+
+      nodeGroup.select("text").text(d => d.label);
+    }
+
+    function getNodeById(id) {
+      return nodes.find(n => n.id === id);
+    }
+
+    function dragStarted(event, d) {
+      d3.select(this).raise();
+    }
+
+    function dragged(event, d) {
+      d.x = event.x;
+      d.y = event.y;
+      update();
+    }
+
+    function dragEnded(event, d) {}
+
+    // Add new node on double click
+    svg.on("dblclick", function (event) {
+      const [x, y] = d3.pointer(event, container.node());
+      const id = Date.now();
+      const label = prompt("Enter node label:", "New Node") || "Node";
+
+      nodes.push({ id, label, x, y });
+
+      // Link to the last added node
+      if (nodes.length > 1) {
+        links.push({ source: nodes[nodes.length - 2].id, target: id });
+      }
+
+      update();
+    });
+
+    update();
+  </script>
 </body>
 </html>
