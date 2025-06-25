@@ -285,16 +285,30 @@
 
     // ✅ Inline style helper
     function inlineStyles(svgElement) {
-      svgElement.querySelectorAll("*").forEach(el => {
-        const computed = getComputedStyle(el);
-        el.setAttribute("fill", computed.fill);
-        el.setAttribute("stroke", computed.stroke);
-        el.setAttribute("stroke-width", computed["stroke-width"]);
-        el.setAttribute("font-size", computed["font-size"]);
-        el.setAttribute("font-family", computed["font-family"]);
-        el.setAttribute("text-anchor", computed["text-anchor"]);
-      });
+  svgElement.querySelectorAll("*").forEach(el => {
+    const computed = getComputedStyle(el);
+    const tag = el.tagName.toLowerCase();
+
+    // General common styles
+    el.setAttribute("fill", computed.fill);
+    el.setAttribute("stroke", computed.stroke);
+    el.setAttribute("stroke-width", computed["stroke-width"]);
+    el.setAttribute("font-size", computed["font-size"]);
+    el.setAttribute("font-family", computed["font-family"]);
+    el.setAttribute("text-anchor", computed["text-anchor"]);
+    el.setAttribute("dominant-baseline", computed["dominant-baseline"]);
+
+    // Fix missing styles for circle and text
+    if (tag === "circle") {
+      el.setAttribute("r", el.getAttribute("r") || "30");
+      el.setAttribute("fill", el.getAttribute("fill") || "white");
+      el.setAttribute("stroke", el.getAttribute("stroke") || "black");
     }
+    if (tag === "text") {
+      el.setAttribute("fill", el.getAttribute("fill") || "black");
+    }
+  });
+}
 
     // ✅ Fixed exportImage()
     function exportImage() {
