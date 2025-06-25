@@ -82,21 +82,8 @@
       box-shadow: 0 4px 6px rgba(0,0,0,0.3);
     }
 
-    #noteModal {
+    input[type="file"] {
       display: none;
-      position: fixed;
-      top: 20%;
-      left: 10%;
-      right: 10%;
-      padding: 20px;
-      background: white;
-      border-radius: 12px;
-      box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
-      z-index: 1000;
-    }
-    #noteModal textarea {
-      width: 100%;
-      height: 150px;
     }
   </style>
   <script src="https://d3js.org/d3.v7.min.js"></script>
@@ -104,328 +91,205 @@
 </head>
 <body>
 
-<button id="toggleMenu">☰</button>
-<div class="menu">
-  <button class="fab" onclick="saveMap()">💾 Save</button>
-  <label class="fab green" style="cursor:pointer">
-    📂 Load<input type="file" onchange="loadMap(event)">
-  </label>
-  <button class="fab" onclick="exportImage()">🖼️ PNG</button>
-  <button class="fab" onclick="exportPDF()">📄 PDF</button>
-  <button class="fab gray" onclick="undo()">↩️ Undo</button>
-  <button class="fab gray" onclick="redo()">↪️ Redo</button>
-</div>
+  <!-- Toggle Menu Button -->
+  <button id="toggleMenu">☰</button>
 
-<svg id="mindmap"></svg>
+  <!-- Horizontal Bottom Menu -->
+  <div class="menu">
+    <button class="fab" onclick="saveMap()">💾 Save</button>
+    <label class="fab green" style="cursor:pointer">
+      📂 Load<input type="file" onchange="loadMap(event)">
+    </label>
+    <button class="fab" onclick="exportImage()">🖼️ PNG</button>
+    <button class="fab" onclick="exportPDF()">📄 PDF</button>
+    <button class="fab gray" onclick="undo()">↩️ Undo</button>
+    <button class="fab gray" onclick="redo()">↪️ Redo</button>
+  </div>
 
-<div id="noteModal">
-  <h3>Edit Note</h3>
-  <textarea id="noteInput"></textarea><br/>
-  <button onclick="saveNote()">Save</button>
-  <button onclick="closeNote()">Cancel</button>
-</div>
+  <!-- Mind Map SVG -->
+  <svg id="mindmap"></svg>
 
-<script>
-const svg = d3.select("#mindmap");
-const g = svg.append("g");
-const width = window.innerWidth;
-const height = window.innerHeight;
+  <script>
+    const svg = d3.select("#mindmap");
+    const g = svg.append("g");
+    const width = window.innerWidth;
+    const height = window.innerHeight;
 
-svg.call(
-  d3.zoom().scaleExtent([0.2, 3]).on("zoom", (event) => g.attr("transform", event.transform))
-).on("dblclick.zoom", null);
+    svg.call(
+      d3.zoom()
+        .scaleExtent([0.2, 3])
+        .on("zoom", (event) => {
+          g.attr("transform", event.transform);
+        })
+    ).on("dblclick.zoom", null);
 
-let nodes = [{ id: 1, label: "Root", x: width / 2, y: height / 2 }];
-let links = [];
-let selectedId = 1;
-let history = [];
-let future = [];
-let editingNodeId = null;
+    let nodes = [{ id: 1, label: "Root", x: width / 2, y: height / 2 }];
+    let links = [];
+    let selectedId = 1;
+    let history = [];
+    let future = [];
 
-function saveState() {
-  history.push(JSON.stringify({ nodes, links, selectedId }));
-  if (history.length > 50) history.shift();
-  future = [];
-}
+    function saveState() {
+      history.push(JSON.stringify({ nodes, links, selectedId }));
+      if (history.length > 50) history.shift();
+      future = [];
+    }
 
-function restore(state) {
-  const data = JSON.parse(state);
-  nodes = data.nodes;
-  links = data.links;
-  selectedId = data.selectedId;
-  update();
-}
-
-function undo() {
-  if (history.length < 2) return;
-  future.push(history.pop());
-  restore(history[history.length - 1]);
-}
-
-function redo() {
-  if (future.length === 0) return;
-  const state = future.pop();
-  history.push(state);
-  restore(state);
-}
-
-function getNodeById(id) {
-  return nodes.find(n => n.id === id);
-}
-
-function autoSpace(x, y, w, h) {
-  let tries = 0;
-  while (tries++ < 10) {
-    const collision = nodes.some(n =>
-      Math.abs(x - n.x) < w && Math.abs(y - n.y) < h
-    );
-    if (!collision) break;
-    x += 20;
-    y += 20;
-  }
-  return { x, y };
-}
-
-function update() {
-  g.selectAll("*").remove();
-
-  g.selectAll("line")
-    .data(links)
-    .join("line")
-    .attr("class", "link")
-    .attr("x1", d => getNodeById(d.source).x)
-    .attr("y1", d => getNodeById(d.source).y)
-    .attr("x2", d => getNodeById(d.target).x)
-    .attr("y2", d => getNodeById(d.target).y);
-
-  const nodeGroup = g.selectAll("g")
-    .data(nodes, d => d.id)
-    .join("g")
-    .attr("transform", d => `translate(${d.x},${d.y})`)
-    .on("click", (event, d) => {
-      event.stopPropagation();
-      selectedId = d.id;
-    })
-    .call(d3.drag().on("drag", (event, d) => {
-      d.x = event.x;
-      d.y = event.y;
+    function restore(state) {
+      const data = JSON.parse(state);
+      nodes = data.nodes;
+      links = data.links;
+      selectedId = data.selectedId;
       update();
-    }));
+    }
 
-  nodeGroup.append("circle")
-    .attr("r", 30)
-    .attr("class", "node")
-    .attr("stroke", d => d.id === selectedId ? "blue" : "black")
-    .attr("stroke-width", d => d.id === selectedId ? 4 : 2);
+    function undo() {
+      if (history.length < 2) return;
+      future.push(history.pop());
+      restore(history[history.length - 1]);
+    }
 
-  nodeGroup.append("text")
-    .attr("class", "label")
-    .attr("dy", "0.35em")
-    .text(d => d.label)
-    .style("pointer-events", "all")
-    .on("click", (event, d) => {
-      event.stopPropagation();
-      const newLabel = prompt("Edit label:", d.label);
-      if (newLabel) {
-        d.label = newLabel;
-        saveState();
-        update();
-      }
-    });
+    function redo() {
+      if (future.length === 0) return;
+      const state = future.pop();
+      history.push(state);
+      restore(state);
+    }
 
-  nodeGroup.append("text")
-    .attr("x", 35)
-    .attr("y", -10)
-    .attr("class", "label")
-    .style("font-size", "16px")
-    .style("cursor", "pointer")
-    .style("pointer-events", "all")
-    .text("+")
-    .on("click", (event, d) => {
-      event.stopPropagation();
-      addNodeTo(d.id);
-    });
+    function getNodeById(id) {
+      return nodes.find(n => n.id === id);
+    }
 
-  nodeGroup.append("text")
-    .attr("x", 35)
-    .attr("y", 10)
-    .attr("class", "label")
-    .style("font-size", "16px")
-    .style("cursor", "pointer")
-    .style("pointer-events", "all")
-    .text("🗑️")
-    .on("click", (event, d) => {
-      event.stopPropagation();
-      if (d.id === 1) return alert("Can't delete root");
-      deleteNodeById(d.id);
-    });
+    function update() {
+      g.selectAll("*").remove();
 
-  nodeGroup.append("text")
-    .attr("x", -45)
-    .attr("y", -40)
-    .attr("class", "label")
-    .style("font-size", "14px")
-    .style("cursor", "pointer")
-    .style("pointer-events", "all")
-    .text("📄")
-    .on("click", (event, d) => {
-      event.stopPropagation();
-      openNoteEditor(d);
-    });
+      g.selectAll("line")
+        .data(links)
+        .join("line")
+        .attr("class", "link")
+        .attr("x1", d => getNodeById(d.source).x)
+        .attr("y1", d => getNodeById(d.source).y)
+        .attr("x2", d => getNodeById(d.target).x)
+        .attr("y2", d => getNodeById(d.target).y);
 
-  // Draw notes
-  nodes.forEach(d => {
-    if (!d.note) return;
-    const lines = d.note.split(/\n|\r|\r\n/);
-    const noteWidth = 160;
-    const lineHeight = 16;
-    const noteHeight = lines.length * lineHeight + 10;
-    const { x: nx, y: ny } = autoSpace(d.x + 40, d.y - noteHeight / 2, noteWidth + 30, noteHeight + 20);
+      const nodeGroup = g.selectAll("g")
+        .data(nodes, d => d.id)
+        .join("g")
+        .attr("transform", d => `translate(${d.x},${d.y})`)
+        .on("click", (event, d) => {
+          event.stopPropagation();
+          selectedId = d.id;
+        })
+        .call(d3.drag().on("drag", (event, d) => {
+          d.x = event.x;
+          d.y = event.y;
+          update();
+        }));
 
-    g.append("rect")
-      .attr("x", nx)
-      .attr("y", ny)
-      .attr("width", noteWidth)
-      .attr("height", noteHeight)
-      .attr("rx", 10)
-      .attr("ry", 10)
-      .attr("fill", "#fff8dc")
-      .attr("stroke", "#aaa");
+      nodeGroup.append("circle")
+        .attr("r", 30)
+        .attr("class", "node")
+        .attr("stroke", d => d.id === selectedId ? "blue" : "black")
+        .attr("stroke-width", d => d.id === selectedId ? 4 : 2);
 
-    lines.forEach((line, i) => {
-      g.append("text")
-        .attr("x", nx + noteWidth / 2)
-        .attr("y", ny + 20 + i * lineHeight)
+      nodeGroup.append("text")
         .attr("class", "label")
-        .text(line);
-    });
-  });
-}
+        .attr("dy", "0.35em")
+        .text(d => d.label)
+        .style("pointer-events", "all")
+        .on("click", (event, d) => {
+          event.stopPropagation();
+          const newLabel = prompt("Edit label:", d.label);
+          if (newLabel) {
+            d.label = newLabel;
+            saveState();
+            update();
+          }
+        });
 
-function addNodeTo(parentId) {
-  const id = Date.now();
-  const label = prompt("Label:", "Node") || "Node";
-  const parent = getNodeById(parentId);
-  const children = links.filter(l => l.source === parentId).length;
-  const angle = (children * 45) * (Math.PI / 180);
-  let x = parent.x + 120 * Math.cos(angle);
-  let y = parent.y + 120 * Math.sin(angle);
-  const spaced = autoSpace(x, y, 60, 60);
-  x = spaced.x; y = spaced.y;
+      nodeGroup.append("text")
+        .attr("x", 35)
+        .attr("y", -10)
+        .attr("class", "label")
+        .style("font-size", "16px")
+        .style("cursor", "pointer")
+        .style("pointer-events", "all")
+        .text("+")
+        .on("click", (event, d) => {
+          event.stopPropagation();
+          addNodeTo(d.id);
+        });
 
-  nodes.push({ id, label, x, y });
-  links.push({ source: parentId, target: id });
-  selectedId = id;
-  saveState();
-  update();
-}
+      nodeGroup.append("text")
+        .attr("x", 35)
+        .attr("y", 10)
+        .attr("class", "label")
+        .style("font-size", "16px")
+        .style("cursor", "pointer")
+        .style("pointer-events", "all")
+        .text("🗑️")
+        .on("click", (event, d) => {
+          event.stopPropagation();
+          if (d.id === 1) return alert("Can't delete root");
+          deleteNodeById(d.id);
+        });
+    }
 
-function deleteNodeById(id) {
-  nodes = nodes.filter(n => n.id !== id);
-  links = links.filter(l => l.source !== id && l.target !== id);
-  if (selectedId === id) selectedId = 1;
-  saveState();
-  update();
-}
+    function addNodeTo(parentId) {
+      const id = Date.now();
+      const label = prompt("Label:", "Node") || "Node";
+      const parent = getNodeById(parentId);
+      const children = links.filter(l => l.source === parentId).length;
+      const angle = (children * 45) * (Math.PI / 180);
+      const x = parent.x + 120 * Math.cos(angle);
+      const y = parent.y + 120 * Math.sin(angle);
 
-function openNoteEditor(node) {
-  document.getElementById("noteInput").value = node.note || "";
-  editingNodeId = node.id;
-  document.getElementById("noteModal").style.display = "block";
-}
+      nodes.push({ id, label, x, y });
+      links.push({ source: parentId, target: id });
+      selectedId = id;
+      saveState();
+      update();
+    }
 
-function closeNote() {
-  document.getElementById("noteModal").style.display = "none";
-}
+    function deleteNodeById(id) {
+      nodes = nodes.filter(n => n.id !== id);
+      links = links.filter(l => l.source !== id && l.target !== id);
+      if (selectedId === id) selectedId = 1;
+      saveState();
+      update();
+    }
 
-function saveNote() {
-  const text = document.getElementById("noteInput").value;
-  const node = getNodeById(editingNodeId);
-  node.note = text;
-  closeNote();
-  saveState();
-  update();
-}
-
-function saveMap() {
-  const data = { nodes, links };
-  const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = "mindmap.json";
-  a.click();
-}
-
-function loadMap(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    const data = JSON.parse(e.target.result);
-    nodes = data.nodes;
-    links = data.links;
-    selectedId = 1;
-    saveState();
-    update();
-  };
-  reader.readAsText(file);
-}
-
-function exportImage() {
-  const clone = svg.node().cloneNode(true);
-  inlineStyles(clone);
-  const svgData = new XMLSerializer().serializeToString(clone);
-  const svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
-  const url = URL.createObjectURL(svgBlob);
-
-  const img = new Image();
-  img.onload = function () {
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext("2d");
-    ctx.fillStyle = "#f5f5f5";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(img, 0, 0);
-    canvas.toBlob(blob => {
+    function saveMap() {
+      const data = { nodes, links };
+      const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = "mindmap.png";
+      a.download = "mindmap.json";
       a.click();
-    });
-  };
-  img.src = url;
-}
+    }
 
-function exportPDF() {
-  const clone = svg.node().cloneNode(true);
-  inlineStyles(clone);
-  const svgData = new XMLSerializer().serializeToString(clone);
-  const svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
-  const url = URL.createObjectURL(svgBlob);
+    function loadMap(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        const data = JSON.parse(e.target.result);
+        nodes = data.nodes;
+        links = data.links;
+        selectedId = 1;
+        saveState();
+        update();
+      };
+      reader.readAsText(file);
+    }
 
-  const img = new Image();
-  img.onload = function () {
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext("2d");
-    ctx.fillStyle = "#f5f5f5";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(img, 0, 0);
-
-    const imgData = canvas.toDataURL("image/png");
-    const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({ orientation: "landscape", unit: "px", format: [canvas.width, canvas.height] });
-    pdf.addImage(imgData, "PNG", 0, 0, canvas.width, canvas.height);
-    pdf.save("mindmap.pdf");
-  };
-  img.src = url;
-}
-
-function inlineStyles(svgElement) {
+    // ✅ Inline style helper
+    function inlineStyles(svgElement) {
   svgElement.querySelectorAll("*").forEach(el => {
     const computed = getComputedStyle(el);
+    const tag = el.tagName.toLowerCase();
+
+    // General common styles
     el.setAttribute("fill", computed.fill);
     el.setAttribute("stroke", computed.stroke);
     el.setAttribute("stroke-width", computed["stroke-width"]);
@@ -433,16 +297,84 @@ function inlineStyles(svgElement) {
     el.setAttribute("font-family", computed["font-family"]);
     el.setAttribute("text-anchor", computed["text-anchor"]);
     el.setAttribute("dominant-baseline", computed["dominant-baseline"]);
+
+    // Fix missing styles for circle and text
+    if (tag === "circle") {
+      el.setAttribute("r", el.getAttribute("r") || "30");
+      el.setAttribute("fill", el.getAttribute("fill") || "white");
+      el.setAttribute("stroke", el.getAttribute("stroke") || "black");
+    }
+    if (tag === "text") {
+      el.setAttribute("fill", el.getAttribute("fill") || "black");
+    }
   });
 }
 
-// Init
-saveState();
-update();
+    // ✅ Fixed exportImage()
+    function exportImage() {
+      const clone = svg.node().cloneNode(true);
+      inlineStyles(clone);
+      const svgData = new XMLSerializer().serializeToString(clone);
+      const svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
+      const url = URL.createObjectURL(svgBlob);
 
-document.getElementById("toggleMenu").addEventListener("click", () => {
-  document.querySelector(".menu").classList.toggle("hidden");
-});
-</script>
+      const img = new Image();
+      img.onload = function () {
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#f5f5f5";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0);
+        canvas.toBlob(blob => {
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(blob);
+          a.download = "mindmap.png";
+          a.click();
+        });
+      };
+      img.src = url;
+    }
+
+    // ✅ Fixed exportPDF()
+    async function exportPDF() {
+      const clone = svg.node().cloneNode(true);
+      inlineStyles(clone);
+      const svgData = new XMLSerializer().serializeToString(clone);
+      const svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
+      const url = URL.createObjectURL(svgBlob);
+
+      const img = new Image();
+      img.onload = async function () {
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#f5f5f5";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0);
+
+        const imgData = canvas.toDataURL("image/png");
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF({
+          orientation: "landscape",
+          unit: "px",
+          format: [canvas.width, canvas.height]
+        });
+
+        pdf.addImage(imgData, "PNG", 0, 0, canvas.width, canvas.height);
+        pdf.save("mindmap.pdf");
+      };
+      img.src = url;
+    }
+
+    document.getElementById("toggleMenu").addEventListener("click", () => {
+      document.querySelector(".menu").classList.toggle("hidden");
+    });
+
+    saveState();
+    update();
+  </script>
 </body>
 </html>
